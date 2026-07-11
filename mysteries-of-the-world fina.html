@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mysteries of the World — Interactive Globe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#070a14;
+    --void-2:#0c1122;
+    --gold:#cfa35e;
+    --gold-1:#d8b262;
+    --gold-2:#8b6d3f;
+    --cream:#f3ead2;
+    --teal:#3fd8d4;
+    --violet:#b18cf2;
+    --ink:#1b140a;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:radial-gradient(ellipse at 50% 20%, #10162b 0%, #070a14 60%, #030409 100%);
+    overflow:hidden;
+    font-family:'Crimson Text', serif;
+    color:var(--cream);
+  }
+  #stars{position:fixed; inset:0; z-index:0;}
+  #globeCanvas{position:fixed; inset:0; z-index:1; cursor:grab;}
+  #globeCanvas:active{cursor:grabbing;}
+
+  .veil{position:fixed; inset:0; pointer-events:none; z-index:2;
+    background:radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(3,4,9,0.55) 100%);}
+
+  header{
+    position:fixed; top:0; left:0; right:0; z-index:5;
+    display:flex; flex-direction:column; align-items:center;
+    padding:22px 16px 10px; pointer-events:none;
+  }
+  h1{
+    font-family:'Cinzel', serif; font-weight:900;
+    font-size:clamp(22px, 4vw, 40px);
+    letter-spacing:2px;
+    margin:0;
+    color:var(--gold-1);
+    text-shadow:0 0 18px rgba(216,178,98,0.45), 0 2px 0 rgba(0,0,0,0.6);
+  }
+  .subtitle{
+    font-family:'Cinzel', serif; font-size:12px; letter-spacing:4px;
+    text-transform:uppercase; color:var(--teal); margin-top:6px; opacity:0.9;
+  }
+  .disclaimer{
+    font-size:12px; color:#8b93ab; margin-top:8px; max-width:520px; text-align:center;
+    font-style:italic; line-height:1.4; letter-spacing:0.2px;
+  }
+
+  .hud-btn{
+    pointer-events:all;
+    position:fixed; z-index:6;
+    background:linear-gradient(160deg, #1a1f33, #0c0f1c);
+    border:1px solid var(--gold-2);
+    color:var(--cream);
+    font-family:'Cinzel',serif; font-size:11px; letter-spacing:1px;
+    padding:9px 14px; border-radius:8px; cursor:pointer;
+    box-shadow:0 4px 14px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(216,178,98,0.15);
+    transition:all .2s ease;
+  }
+  .hud-btn:hover{border-color:var(--gold-1); box-shadow:0 4px 18px rgba(216,178,98,0.35), inset 0 0 0 1px rgba(216,178,98,0.3);}
+  .hud-btn.active{background:linear-gradient(160deg,#3a2f14,#1c1608); border-color:var(--gold-1); color:var(--gold-1);}
+
+  #spinBtn{top:22px; right:20px;}
+  #resetBtn{top:66px; right:20px;}
+
+  #legend{
+    position:fixed; top:22px; left:20px; z-index:6;
+    display:flex; flex-direction:column; gap:6px;
+    background:rgba(10,13,24,0.55); border:1px solid rgba(216,178,98,0.25);
+    border-radius:10px; padding:10px 14px; backdrop-filter:blur(6px);
+    font-size:12px;
+  }
+  .legend-row{display:flex; align-items:center; gap:8px;}
+  .legend-dot{width:9px; height:9px; border-radius:50%;}
+
+  /* Filter pills */
+  .filters{
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+    z-index:6; display:flex; gap:10px; flex-wrap:wrap; justify-content:center;
+    max-width:94vw; pointer-events:all;
+  }
+  .pill{
+    font-family:'Cinzel', serif; font-size:12px; letter-spacing:1.5px;
+    padding:11px 20px; border-radius:999px; cursor:pointer;
+    background:linear-gradient(160deg, #1a2036, #0b0e19);
+    border:1px solid var(--gold-2); color:#d8d3c4;
+    transition:all .25s ease; text-transform:uppercase;
+    box-shadow:0 4px 12px rgba(0,0,0,0.45);
+  }
+  .pill:hover{transform:translateY(-2px); border-color:var(--gold-1);}
+  .pill.active{
+    background:linear-gradient(160deg, #4a3a12, #241b09);
+    border-color:var(--gold-1); color:var(--gold-1);
+    box-shadow:0 0 22px rgba(216,178,98,0.4), 0 4px 12px rgba(0,0,0,0.5);
+  }
+
+  /* Site count */
+  #siteCount{
+    position:fixed; bottom:78px; left:50%; transform:translateX(-50%);
+    z-index:6; font-size:11px; letter-spacing:2px; color:#7c84a0;
+    text-transform:uppercase; font-family:'Cinzel',serif;
+  }
+
+  /* Info panel */
+  #panel{
+    position:fixed; top:0; right:0; height:100%;
+    width:min(420px, 92vw);
+    background:
+      linear-gradient(180deg, rgba(24,18,10,0.0), rgba(24,18,10,0.0)),
+      linear-gradient(160deg, #f3ead2 0%, #e9dcb8 100%);
+    color:var(--ink);
+    box-shadow:-10px 0 40px rgba(0,0,0,0.6);
+    transform:translateX(105%);
+    transition:transform .45s cubic-bezier(.2,.8,.2,1);
+    z-index:10; overflow-y:auto;
+    border-left:3px solid var(--gold-2);
+  }
+  #panel.open{transform:translateX(0);}
+  #panel::before{
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:
+      repeating-linear-gradient(0deg, rgba(139,109,63,0.05) 0px, rgba(139,109,63,0.05) 1px, transparent 1px, transparent 3px);
+    mix-blend-mode:multiply;
+  }
+  .panel-inner{position:relative; padding:26px 26px 60px;}
+  .panel-close{
+    position:absolute; top:16px; right:16px; cursor:pointer;
+    width:34px; height:34px; border-radius:50%;
+    background:rgba(27,20,10,0.08); border:1px solid rgba(27,20,10,0.25);
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; color:var(--ink); line-height:1;
+  }
+  .panel-eyebrow{
+    font-family:'Cinzel',serif; font-size:11px; letter-spacing:3px;
+    text-transform:uppercase; color:var(--gold-2); margin-bottom:8px;
+  }
+  .panel-title{
+    font-family:'Cinzel',serif; font-weight:700; font-size:26px;
+    line-height:1.15; margin:0 0 6px; padding-right:40px;
+  }
+  .panel-meta{font-size:13px; color:#5a4c2f; margin-bottom:18px; font-style:italic;}
+  .divider{
+    border:none; height:1px;
+    background:linear-gradient(90deg, transparent, var(--gold-2), transparent);
+    margin:18px 0;
+  }
+  .section-label{
+    display:flex; align-items:center; gap:8px;
+    font-family:'Cinzel',serif; font-size:13px; letter-spacing:1.5px;
+    text-transform:uppercase; margin-bottom:10px; font-weight:700;
+  }
+  .section-label.theory{color:#6a3fb8;}
+  .section-label.fact{color:#1a6e5c;}
+  .badge{font-size:14px;}
+  .section-text{font-size:16px; line-height:1.55; margin:0 0 4px;}
+  .theory-box{
+    background:rgba(177,140,242,0.12); border:1px solid rgba(177,140,242,0.4);
+    border-radius:10px; padding:14px 16px; margin-bottom:6px;
+  }
+  .fact-box{
+    background:rgba(63,216,212,0.10); border:1px solid rgba(63,216,212,0.4);
+    border-radius:10px; padding:14px 16px;
+  }
+  .research-box{
+    background:rgba(63,216,212,0.06); border:1px solid rgba(63,216,212,0.3);
+    border-radius:10px; padding:14px 16px; margin-top:6px;
+  }
+  .research-link{
+    display:flex; align-items:center; gap:8px;
+    font-size:14px; padding:8px 4px; text-decoration:none; color:var(--ink);
+    border-bottom:1px dashed rgba(139,109,63,0.3);
+  }
+  .research-link:last-child{border-bottom:none;}
+  .research-link .arrow{color:#1a6e5c; font-size:15px;}
+  .deep-search-btn{
+    display:inline-flex; align-items:center; gap:8px; margin-top:12px;
+    font-family:'Cinzel',serif; font-size:12px; letter-spacing:1px; text-transform:uppercase;
+    padding:11px 18px; border-radius:8px; text-decoration:none;
+    background:linear-gradient(160deg,#1a3a38,#0c1f1d); color:#6be0da;
+    border:1px solid rgba(63,216,212,0.5);
+  }
+  .coords{
+    margin-top:20px; font-size:12px; color:#7a6a44; letter-spacing:0.5px;
+    display:flex; justify-content:space-between; border-top:1px dashed rgba(139,109,63,0.4); padding-top:12px;
+  }
+
+  /* Intro overlay */
+  #intro{
+    position:fixed; inset:0; z-index:20;
+    background:radial-gradient(ellipse at 50% 40%, #12182c 0%, #050710 75%);
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    text-align:center; padding:24px; transition:opacity .6s ease, visibility .6s;
+  }
+  #intro h2{font-family:'Cinzel',serif; color:var(--gold-1); font-size:clamp(24px,5vw,42px); letter-spacing:2px; margin-bottom:14px; text-shadow:0 0 24px rgba(216,178,98,0.5);}
+  #intro p{max-width:520px; font-size:16px; line-height:1.6; color:#c9cbe0; margin-bottom:26px;}
+  #intro .enter-btn{
+    font-family:'Cinzel',serif; letter-spacing:2px; text-transform:uppercase;
+    padding:14px 38px; border-radius:999px; cursor:pointer; font-size:14px;
+    background:linear-gradient(160deg,#4a3a12,#241b09); border:1px solid var(--gold-1); color:var(--gold-1);
+    box-shadow:0 0 26px rgba(216,178,98,0.35);
+    transition:transform .2s ease;
+  }
+  #intro .enter-btn:hover{transform:scale(1.05);}
+  #intro.hidden{opacity:0; visibility:hidden; pointer-events:none;}
+
+  .hint{
+    position:fixed; bottom:120px; left:50%; transform:translateX(-50%);
+    font-size:12px; color:#697089; letter-spacing:1px; z-index:6; text-align:center;
+    opacity:0.85;
+  }
+  .modeSwitch{
+    position:fixed; top:22px; left:50%; transform:translateX(-50%);
+    z-index:6; display:flex; gap:4px; pointer-events:all;
+    background:rgba(10,13,24,0.55); border:1px solid rgba(216,178,98,0.3);
+    border-radius:999px; padding:5px; backdrop-filter:blur(6px);
+  }
+  .modeTab{
+    font-family:'Cinzel',serif; font-size:12px; letter-spacing:1px;
+    padding:9px 18px; border-radius:999px; cursor:pointer; color:#9aa1b8;
+    transition:all .25s ease; white-space:nowrap;
+  }
+  .modeTab.active{
+    background:linear-gradient(160deg,#4a3a12,#241b09); color:var(--gold-1);
+    box-shadow:0 0 16px rgba(216,178,98,0.35);
+  }
+  .codex-link-row{
+    display:flex; align-items:flex-start; gap:10px;
+    padding:11px 4px; border-bottom:1px dashed rgba(139,109,63,0.3);
+    text-decoration:none; color:var(--ink);
+  }
+  .codex-link-row:last-child{border-bottom:none;}
+  .codex-link-icon{font-size:15px; color:#6a3fb8; margin-top:2px;}
+  .codex-link-title{font-family:'Cinzel',serif; font-size:14px; font-weight:700; margin-bottom:2px;}
+  .codex-link-desc{font-size:13px; color:#5a4c2f; line-height:1.4;}
+  @media (max-width:640px){
+    #legend{display:none;}
+    .hint{bottom:130px;}
+    .modeSwitch{top:auto; bottom:172px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="intro">
+  <h2>Mysteries of the World</h2>
+  <p>An interactive globe of legendary sites, alien lore, and ancient wonders — the fringe theories people tell,
+  set right alongside what historians and scientists actually know. Purely for exploration and entertainment.</p>
+  <div class="enter-btn" id="enterBtn">Begin Exploring</div>
+</div>
+
+<canvas id="stars"></canvas>
+<canvas id="globeCanvas"></canvas>
+<div class="veil"></div>
+
+<header>
+  <h1>Mysteries of the World</h1>
+  <div class="subtitle">Alternative Theories · Real History</div>
+  <div class="disclaimer">Entertainment purposes only. Alternative theories are presented as folklore & speculation, not fact — verified history is included for every site.</div>
+</header>
+
+<div id="legend">
+  <div class="legend-row"><span class="legend-dot" style="background:#d8b262;box-shadow:0 0 8px #d8b262;"></span>Ancient Sites</div>
+  <div class="legend-row"><span class="legend-dot" style="background:#3fd8d4;box-shadow:0 0 8px #3fd8d4;"></span>Aliens &amp; UAP</div>
+  <div class="legend-row"><span class="legend-dot" style="background:#b18cf2;box-shadow:0 0 8px #b18cf2;"></span>Lost &amp; Legendary</div>
+</div>
+
+<div class="hud-btn" id="spinBtn">⟳ AUTO-SPIN</div>
+<div class="hud-btn" id="resetBtn">⤾ RESET VIEW</div>
+
+<div class="modeSwitch" id="modeSwitch">
+  <div class="modeTab active" data-mode="mysteries">🗺️ Mysteries</div>
+  <div class="modeTab" data-mode="codex">⚜️ Castille Codex</div>
+</div>
+
+<div class="hint" id="hintText">Drag to rotate · Scroll to zoom · Click a glowing marker</div>
+
+<div id="siteCount"></div>
+<div class="filters" id="filters">
+  <div class="pill active" data-cat="all">All Sites</div>
+  <div class="pill" data-cat="ancient">Ancient Sites</div>
+  <div class="pill" data-cat="aliens">Aliens &amp; UAP</div>
+  <div class="pill" data-cat="legendary">Lost &amp; Legendary</div>
+</div>
+
+<div id="panel">
+  <div class="panel-inner" id="panelInner"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============ STARFIELD BACKGROUND ============ */
+(function(){
+  const c = document.getElementById('stars');
+  const ctx = c.getContext('2d');
+  function resize(){ c.width = innerWidth; c.height = innerHeight; }
+  resize(); window.addEventListener('resize', resize);
+  const stars = Array.from({length:280}, () => ({
+    x: Math.random(), y: Math.random(), r: Math.random()*1.4+0.2,
+    tw: Math.random()*Math.PI*2, sp: Math.random()*0.02+0.005
+  }));
+  function draw(t){
+    ctx.clearRect(0,0,c.width,c.height);
+    for(const s of stars){
+      const alpha = 0.4 + 0.6*Math.abs(Math.sin(s.tw + t*s.sp));
+      ctx.fillStyle = `rgba(230,230,255,${alpha})`;
+      ctx.beginPath();
+      ctx.arc(s.x*c.width, s.y*c.height, s.r, 0, Math.PI*2);
+      ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+/* ============ CDN LOAD GUARD ============ */
+if (typeof THREE === 'undefined') {
+  document.getElementById('intro').innerHTML = `
+    <h2 style="color:#e0688b;">Couldn't Load the 3D Engine</h2>
+    <p>This globe needs to download a graphics library (three.js) from the web, and it didn't come through. Try this:</p>
+    <p style="text-align:left; max-width:440px; margin:0 auto 20px;">
+      1. Check you're connected to Wi-Fi or cellular data<br>
+      2. Tap the "<b>Aa</b>" icon in Safari's address bar → <b>Turn Off Content Blockers</b> for this page<br>
+      3. If you're in a Private/Lockdown browsing mode, try a normal tab<br>
+      4. Pull down to reload the page
+    </p>
+    <div class="enter-btn" onclick="location.reload()">Reload Page</div>
+  `;
+  document.getElementById('intro').classList.remove('hidden');
+  throw new Error('THREE.js failed to load from CDN — aborting globe initialization.');
+}
+
+/* ============ SITE DATA ============ */
+const SITES = [
+  {
+    id:'giza', name:'Pyramids of Giza', place:'Giza, Egypt', lat:29.9792, lon:31.1342,
+    cat:'ancient', icon:'△',
+    theory:'Fringe researchers claim the pyramids were never tombs at all, but massive power-generating machines — resonant chambers tuned to harness the Earth\'s natural energy, built with help none of us can fully explain.',
+    facts:'Built roughly 4,500 years ago during Egypt\'s Fourth Dynasty as tombs for pharaohs like Khufu, the Great Pyramid was constructed by skilled, organized labor crews using ramps, levers, and extraordinary engineering precision for their era.'
+  },
+  {
+    id:'stonehenge', name:'Stonehenge', place:'Wiltshire, England', lat:51.1789, lon:-1.8262,
+    cat:'ancient', icon:'△',
+    theory:'Some believe the stone circle marks a convergence point of "ley lines," invisible currents of earth energy, or even functions as a dormant portal linking ancient sacred sites across the globe.',
+    facts:'Constructed in stages between about 3000 and 1500 BCE, Stonehenge appears to have served as a burial ground and a solstice-aligned calendar, with its massive sarsen stones hauled from miles away using rollers and sledges.'
+  },
+  {
+    id:'nazca', name:'Nazca Lines', place:'Nazca Desert, Peru', lat:-14.7390, lon:-75.1300,
+    cat:'aliens', icon:'✧',
+    theory:'A popular theory holds that the enormous geoglyphs, only fully visible from the air, were runways or signals meant for visiting extraterrestrial craft.',
+    facts:'Created between 500 BCE and 500 CE by the Nazca people, the lines were made by removing dark surface stones to reveal lighter ground beneath, likely serving ceremonial or astronomical purposes tied to water and fertility rituals.'
+  },
+  {
+    id:'machu', name:'Machu Picchu', place:'Cusco Region, Peru', lat:-13.1631, lon:-72.5450,
+    cat:'aliens', icon:'✧',
+    theory:'Some UAP researchers point to Machu Picchu\'s precise stonework and remote mountaintop placement as evidence of guidance from non-human visitors sharing advanced building techniques.',
+    facts:'Built around 1450 CE as a royal Incan estate, Machu Picchu showcases dry-stone construction so precise that mortar was unnecessary — a technique achieved through generations of accumulated Incan engineering knowledge.'
+  },
+  {
+    id:'easter', name:'Easter Island Moai', place:'Rapa Nui, Chile', lat:-27.1127, lon:-109.3497,
+    cat:'legendary', icon:'☾',
+    theory:'Island legend says the massive moai statues "walked" to their platforms under their own power, channeling a mysterious life force called mana granted by ancestral spirits.',
+    facts:'Carved between 1250 and 1500 CE by the Rapa Nui people, the moai were likely moved using ropes and a rocking, walking motion created by teams of people — a method experimentally replicated by archaeologists in 2012.'
+  },
+  {
+    id:'zimbabwe', name:'Great Zimbabwe', place:'Masvingo, Zimbabwe', lat:-20.2674, lon:30.9337,
+    cat:'legendary', icon:'☾',
+    theory:'Colonial-era explorers, refusing to credit African builders, spread the myth that the ruins were built by a lost foreign civilization — a legend still repeated by some fringe historians today.',
+    facts:'Great Zimbabwe was built by the ancestral Shona people between the 11th and 15th centuries CE, becoming the capital of a powerful trading kingdom with dry-stone walls constructed without any mortar.'
+  },
+  {
+    id:'angkor', name:'Angkor Wat', place:'Siem Reap, Cambodia', lat:13.4125, lon:103.8670,
+    cat:'ancient', icon:'△',
+    theory:'A striking theory suggests Angkor Wat\'s five towers were laid out to mirror the constellation Draco, encoding a star map meant to endure for millennia.',
+    facts:'Built in the early 12th century under King Suryavarman II, Angkor Wat was originally a Hindu temple dedicated to Vishnu before gradually transitioning into a Buddhist site, and remains the largest religious monument on Earth by land area.'
+  },
+  {
+    id:'gobekli', name:'Göbekli Tepe', place:'Şanlıurfa, Turkey', lat:37.2231, lon:38.9226,
+    cat:'legendary', icon:'☾',
+    theory:'Some researchers propose the site\'s builders were survivors of an advanced pre-flood civilization, encoding a memory of a comet impact into its carved animal pillars.',
+    facts:'Dating back roughly 11,600 years, Göbekli Tepe predates Stonehenge by six millennia and is considered by mainstream archaeology to be among the world\'s oldest known monumental structures, built by hunter-gatherers before farming existed.'
+  },
+  {
+    id:'baalbek', name:'Baalbek Trilithon', place:'Baalbek, Lebanon', lat:34.0059, lon:36.2039,
+    cat:'legendary', icon:'☾',
+    theory:'Because its foundation stones weigh over 800 tons each, some claim only "giants" or a forgotten super-civilization with unknown machinery could have moved them.',
+    facts:'The temple complex was expanded under Roman rule starting around the 1st century BCE, and engineers believe the giant stones were moved using wooden sledges, ropes, and large teams of laborers along prepared tracks.'
+  },
+  {
+    id:'teotihuacan', name:'Teotihuacan', place:'Mexico', lat:19.6925, lon:-98.8438,
+    cat:'aliens', icon:'✧',
+    theory:'A popular fringe claim holds that the Pyramid of the Sun sits atop a hidden energy grid, and that its builders — whose identity is still debated — had contact with beings from beyond Earth.',
+    facts:'Flourishing between 100 BCE and 550 CE, Teotihuacan was one of the largest cities in the ancient world, built by a civilization whose name for themselves remains unknown, since the Aztecs later named the abandoned city.'
+  },
+  {
+    id:'bermuda', name:'Bermuda Triangle', place:'North Atlantic Ocean', lat:25.0, lon:-71.0,
+    cat:'aliens', icon:'✧',
+    theory:'Legend holds that ships and aircraft vanish here due to a dimensional rift, an underwater alien base, or unstable magnetic anomalies — the region\'s persistent reputation for mysterious disappearances.',
+    facts:'Statistical studies by maritime and insurance authorities, including Lloyd\'s of London, have found the Triangle\'s incident rate is not significantly higher than other heavily trafficked, storm-prone ocean routes.'
+  },
+  {
+    id:'area51', name:'Area 51', place:'Nevada, USA', lat:37.2431, lon:-115.7930,
+    cat:'aliens', icon:'✧',
+    theory:'The base\'s intense secrecy has fueled decades of claims that it houses recovered alien spacecraft and technology being reverse-engineered far from public view.',
+    facts:'Area 51 is a real, formerly classified U.S. Air Force testing facility, publicly acknowledged in 2013, historically used to develop stealth aircraft like the U-2, A-12, and SR-71 during the Cold War.'
+  },
+  {
+    id:'antarctica', name:'Antarctic Anomaly', place:'Antarctica', lat:-77.0, lon:20.0,
+    cat:'legendary', icon:'☾',
+    theory:'Satellite imagery anomalies have fueled speculation about pyramid-like structures or an entrance to a hidden civilization buried beneath the ice sheet.',
+    facts:'Antarctica has been studied extensively via satellite and ground survey; the "anomalies" cited online are consistently identified by glaciologists as natural rock formations, ice movement patterns, or imaging artifacts.'
+  },
+  {
+    id:'bimini', name:'Bimini Road', place:'Bahamas', lat:25.7617, lon:-79.2649,
+    cat:'legendary', icon:'☾',
+    theory:'Since psychic Edgar Cayce predicted Atlantis would resurface near Bimini in the 1930s, some believe this underwater limestone formation is a paved road from the lost continent itself.',
+    facts:'Geologists who have studied the formation describe it as beachrock: naturally cemented limestone slabs that cracked into regular blocks along tidal fracture lines, a well-documented natural process.'
+  },
+  {
+    id:'atlantis', name:'Atlantis', place:'Mid-Atlantic (legendary)', lat:31.0, lon:-25.0,
+    cat:'legendary', icon:'☾',
+    theory:'According to legend, Atlantis was an advanced island civilization with technology far beyond its time, swallowed by the sea in a single catastrophic night as punishment for its people\'s hubris.',
+    facts:'The story originates entirely from the Greek philosopher Plato\'s dialogues "Timaeus" and "Critias," written around 360 BCE — most historians treat it as a philosophical allegory rather than a historical account.'
+  },
+  {
+    id:'eldorado', name:'El Dorado', place:'Lake Guatavita, Colombia', lat:5.1544, lon:-73.7792,
+    cat:'legendary', icon:'☾',
+    theory:'Legend tells of a lost city built entirely of gold, ruled by a king who ritually covered himself in gold dust before diving into a sacred lake — a myth that drove centuries of doomed treasure expeditions.',
+    facts:'The legend actually stems from a real Muisca ritual at Lake Guatavita, where a new leader was coated in gold dust and offered treasures to the water; the "golden city" itself was a European exaggeration of this ceremony.'
+  },
+  {
+    id:'shambhala', name:'Shambhala', place:'Himalayas (legendary)', lat:29.6, lon:91.1,
+    cat:'legendary', icon:'☾',
+    theory:'Tibetan Buddhist legend describes a hidden kingdom tucked deep in the Himalayas, invisible to outsiders and home to enlightened masters awaiting the right moment to guide humanity.',
+    facts:'Shambhala originates in Tibetan Buddhist and Kalachakra tantric texts as a spiritual, largely symbolic realm; historians and Buddhist scholars generally read it as an allegory for enlightenment rather than a physical location.'
+  },
+];
+
+/* ============ RESEARCH LAYER — real archive links ============ */
+// Paste your Deep.Search URL below (e.g. "https://deep-search.vercel.app") to activate
+// the "Open in Deep.Search" button. Leave blank to hide it.
+const DEEP_SEARCH_URL = "";
+
+const RESEARCH_LINKS = [
+  { label:'National Archives — UAP Records (RG 615)', url:'https://www.archives.gov/research/topics/uaps' },
+  { label:'The Black Vault — UFO Document Archive', url:'https://www.theblackvault.com/documentarchive/category/the-fringe/ufo-phenomena/' },
+  { label:'Project Blue Book Archive', url:'https://www.theprojectbluebookarchive.org/' },
+];
+
+/* ============ CASTILLE CODEX — hub categories & links ============ */
+const CODEX_CATEGORIES = [
+  {
+    id:'research', label:'Documents, Archives & Deep Research', icon:'📜', lat:10, lon:-150, color:0x3fd8d4,
+    links:[
+      {label:'Internet Archive', desc:'The internet\'s memory — archived pages, books, audio & video.', url:'https://archive.org'},
+      {label:'Anna\'s Archive', desc:'Largest shadow library online — millions of books & PDFs.', url:'https://annas-archive.org'},
+      {label:'Library Genesis', desc:'Academic papers, textbooks & scientific journals, free.', url:'http://libgen.is'},
+      {label:'PDF Drive', desc:'Dedicated PDF search engine — 80M+ documents.', url:'https://www.pdfdrive.com'},
+      {label:'Google Scholar', desc:'Academic & scholarly research, citations, peer-reviewed papers.', url:'https://scholar.google.com'},
+      {label:'Semantic Scholar', desc:'AI-powered academic search with citation mapping.', url:'https://www.semanticscholar.org'},
+    ]
+  },
+  {
+    id:'music', label:'Music Production & Audio', icon:'🎛️', lat:10, lon:-90, color:0xb18cf2,
+    links:[
+      {label:'Mixing Academy', desc:'Course home base — mixing & mastering training.', url:'https://mixingacademy.com'},
+      {label:'Splice', desc:'Samples, loops & VST plugins for production.', url:'https://splice.com'},
+      {label:'LANDR', desc:'AI mastering, distribution & production tools.', url:'https://www.landr.com'},
+      {label:'Soundsnap', desc:'Huge library of sound effects & audio samples.', url:'https://www.soundsnap.com'},
+      {label:'r/MixingMastering', desc:'Community knowledge, feedback & production discussion.', url:'https://www.reddit.com/r/MixingandMastering/'},
+      {label:'Freesound', desc:'Creative Commons audio samples, completely free.', url:'https://freesound.org'},
+    ]
+  },
+  {
+    id:'visual', label:'Visual Arts, Photo & Imaging', icon:'🎨', lat:10, lon:-30, color:0xd8b262,
+    links:[
+      {label:'DeviantArt', desc:'Massive visual art community — inspiration & reference.', url:'https://www.deviantart.com'},
+      {label:'Unsplash', desc:'High-res free photos — great source material for upscaling.', url:'https://unsplash.com'},
+      {label:'Flickr', desc:'Huge photo community, including stereoscopic & 3D groups.', url:'https://www.flickr.com'},
+      {label:'r/Anaglyph', desc:'Red-cyan anaglyph community.', url:'https://www.reddit.com/r/Anaglyph/'},
+      {label:'Civitai', desc:'AI art models & image generation resources.', url:'https://civitai.com'},
+      {label:'Behance', desc:'Professional creative portfolios — design & visual inspiration.', url:'https://www.behance.net'},
+    ]
+  },
+  {
+    id:'adult', label:'Adult Content', icon:'🔞', lat:10, lon:30, color:0xe0688b,
+    links:[
+      {label:'Erome', desc:'Community-driven amateur platform, personal albums & videos.', url:'https://www.erome.com'},
+      {label:'EPorner', desc:'Massive HD library, extensive categories.', url:'https://www.eporner.com'},
+      {label:'ThisVid', desc:'Amateur-heavy community platform.', url:'https://thisvid.com'},
+      {label:'SpankBang', desc:'Full-length videos, livestreams & VR content.', url:'https://spankbang.com'},
+      {label:'Biqle', desc:'Large international adult content library.', url:'https://biqle.ru'},
+      {label:'TnaFlix', desc:'Mainstream, amateur & fetish content.', url:'https://www.tnaflix.com'},
+      {label:'DrTuber', desc:'Clean interface, well organized.', url:'https://www.drtuber.com'},
+      {label:'XNXX', desc:'Massive variety, community uploads.', url:'https://www.xnxx.com'},
+      {label:'ImageFap', desc:'Millions of adult photo galleries across every niche.', url:'https://www.imagefap.com'},
+    ]
+  },
+  {
+    id:'culinary', label:'Food & Culinary Arts', icon:'🍽️', lat:10, lon:90, color:0x7cc576,
+    links:[
+      {label:'Serious Eats', desc:'Deep-dive culinary science & recipes.', url:'https://www.seriouseats.com'},
+      {label:'AllRecipes', desc:'Massive community recipe database.', url:'https://www.allrecipes.com'},
+      {label:'TasteAtlas', desc:'World food encyclopedia — traditional dishes by region.', url:'https://www.tasteatlas.com'},
+      {label:'Food52', desc:'Community cooking, baking recipes & kitchen tips.', url:'https://food52.com'},
+      {label:'King Arthur Baking', desc:'The gold standard for baking recipes & technique.', url:'https://www.kingarthurbaking.com'},
+      {label:'r/Food', desc:'Food inspiration, recipes & community photography.', url:'https://www.reddit.com/r/food/'},
+    ]
+  },
+  {
+    id:'video', label:'Video, Tutorials & Learning', icon:'▶', lat:10, lon:150, color:0x6ba6e0,
+    links:[
+      {label:'YouTube', desc:'The everything video platform.', url:'https://www.youtube.com'},
+      {label:'Vimeo', desc:'High quality video — great for creative/professional content.', url:'https://vimeo.com'},
+      {label:'Skillshare', desc:'Creative courses — photo editing, music, design & more.', url:'https://www.skillshare.com'},
+      {label:'Udemy', desc:'Affordable courses on nearly everything.', url:'https://www.udemy.com'},
+      {label:'Archive.org Movies', desc:'Free public domain films & historical footage.', url:'https://archive.org/details/movies'},
+      {label:'r/LearnProgramming', desc:'For the app-building journey — great community resource.', url:'https://www.reddit.com/r/learnprogramming/'},
+    ]
+  },
+];
+
+/* ============ THREE.JS GLOBE ============ */
+const canvas = document.getElementById('globeCanvas');
+let W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(W,H);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, W/H, 0.1, 1000);
+camera.position.set(0,0,15);
+
+scene.add(new THREE.AmbientLight(0x9fb0ff, 0.55));
+const sun = new THREE.DirectionalLight(0xffe9c2, 1.1);
+sun.position.set(6,4,8);
+scene.add(sun);
+const rim = new THREE.DirectionalLight(0x4060ff, 0.4);
+rim.position.set(-6,-3,-8);
+scene.add(rim);
+
+const RADIUS = 5;
+
+/* --- Build stylized antique-map earth texture on a canvas --- */
+function buildEarthTexture(){
+  const w = 2048, h = 1024;
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const g = cv.getContext('2d');
+
+  // ocean gradient
+  const oceanGrad = g.createLinearGradient(0,0,0,h);
+  oceanGrad.addColorStop(0, '#0b3a52');
+  oceanGrad.addColorStop(0.5, '#124a63');
+  oceanGrad.addColorStop(1, '#0b3a52');
+  g.fillStyle = oceanGrad;
+  g.fillRect(0,0,w,h);
+
+  // subtle ocean texture speckle
+  g.globalAlpha = 0.05;
+  for(let i=0;i<4000;i++){
+    g.fillStyle = Math.random()>0.5 ? '#ffffff' : '#000000';
+    g.fillRect(Math.random()*w, Math.random()*h, 1.5, 1.5);
+  }
+  g.globalAlpha = 1;
+
+  function project(lon, lat){
+    const x = (lon+180)/360 * w;
+    const y = (90-lat)/180 * h;
+    return [x,y];
+  }
+  function landPoly(points, fill, stroke){
+    g.beginPath();
+    points.forEach(([lon,lat],i)=>{
+      const [x,y] = project(lon,lat);
+      if(i===0) g.moveTo(x,y); else g.lineTo(x,y);
+    });
+    g.closePath();
+    g.fillStyle = fill;
+    g.fill();
+    g.lineWidth = 3;
+    g.strokeStyle = stroke;
+    g.stroke();
+  }
+
+  const landFill = '#c9a35e';
+  const landEdge = '#8b6d3f';
+
+  const continents = [
+    // Africa
+    [[-17,15],[-5,25],[10,37],[20,33],[33,31],[38,20],[43,12],[51,10],[45,0],[41,-8],[40,-15],[35,-25],[27,-33],[20,-35],[15,-27],[13,-18],[10,4],[3,7],[-6,5],[-12,10],[-17,15]],
+    // Europe
+    [[-10,36],[-9,43],[-5,48],[0,51],[6,53],[10,54],[15,55],[20,55],[25,58],[30,60],[36,64],[40,66],[35,55],[30,45],[24,42],[15,40],[5,39],[-10,36]],
+    // Asia
+    [[26,42],[35,40],[45,38],[55,40],[60,50],[65,55],[75,58],[85,60],[100,60],[115,58],[130,55],[140,50],[140,42],[132,35],[122,25],[110,15],[100,8],[95,3],[80,8],[70,20],[60,25],[50,30],[42,35],[30,38],[26,42]],
+    // India subcontinent
+    [[68,24],[78,32],[85,26],[88,22],[80,10],[74,13],[68,24]],
+    // North America
+    [[-160,68],[-150,60],[-140,60],[-130,55],[-125,48],[-122,38],[-115,30],[-108,24],[-100,20],[-95,16],[-90,14],[-84,9],[-80,8],[-78,20],[-75,32],[-70,42],[-65,45],[-58,50],[-65,58],[-80,62],[-95,68],[-115,72],[-140,71],[-160,68]],
+    // Greenland
+    [[-52,60],[-42,63],[-32,70],[-25,77],[-38,83],[-55,78],[-56,68],[-52,60]],
+    // South America
+    [[-80,9],[-77,3],[-75,-5],[-70,-15],[-70,-25],[-68,-35],[-70,-45],[-73,-53],[-68,-54],[-62,-45],[-58,-34],[-48,-25],[-35,-9],[-40,-2],[-50,3],[-60,8],[-80,9]],
+    // Australia
+    [[113,-22],[122,-17],[130,-12],[137,-12],[142,-11],[145,-16],[153,-25],[150,-33],[141,-38],[133,-32],[128,-32],[122,-34],[115,-34],[113,-26],[113,-22]],
+    // Antarctica strip
+    [[-180,-65],[-90,-70],[0,-65],[90,-70],[180,-65],[180,-90],[-180,-90],[-180,-65]],
+    // Madagascar
+    [[43,-12],[48,-16],[47,-25],[44,-24],[43,-16],[43,-12]],
+    // Japan-ish
+    [[130,32],[133,35],[140,37],[142,40],[141,44],[144,44],[139,35],[130,32]],
+    // UK/Ireland-ish
+    [[-8,50],[-5,54],[-3,58],[-6,58],[-9,53],[-8,50]],
+  ];
+  continents.forEach(pts => landPoly(pts, landFill, landEdge));
+
+  // subtle inner texture (hatching) on land
+  g.globalAlpha = 0.06;
+  g.strokeStyle = '#5a4322';
+  g.lineWidth = 1;
+  for(let y=0;y<h;y+=6){
+    g.beginPath(); g.moveTo(0,y); g.lineTo(w,y); g.stroke();
+  }
+  g.globalAlpha = 1;
+
+  // lat/long grid
+  g.strokeStyle = 'rgba(216,178,98,0.18)';
+  g.lineWidth = 1;
+  for(let lon=-180; lon<=180; lon+=20){
+    const [x] = project(lon,0);
+    g.beginPath(); g.moveTo(x,0); g.lineTo(x,h); g.stroke();
+  }
+  for(let lat=-80; lat<=80; lat+=20){
+    const [,y] = project(0,lat);
+    g.beginPath(); g.moveTo(0,y); g.lineTo(w,y); g.stroke();
+  }
+  // equator emphasis
+  g.strokeStyle = 'rgba(216,178,98,0.35)';
+  g.lineWidth = 1.5;
+  const [,eqY] = project(0,0);
+  g.beginPath(); g.moveTo(0,eqY); g.lineTo(w,eqY); g.stroke();
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const earthTexture = buildEarthTexture();
+const globeGeo = new THREE.SphereGeometry(RADIUS, 96, 96);
+const globeMat = new THREE.MeshPhongMaterial({
+  map: earthTexture,
+  shininess: 8,
+  specular: 0x223344
+});
+const globeGroup = new THREE.Group();
+const globeMesh = new THREE.Mesh(globeGeo, globeMat);
+globeGroup.add(globeMesh);
+scene.add(globeGroup);
+
+// atmosphere glow shell
+const atmGeo = new THREE.SphereGeometry(RADIUS*1.035, 64, 64);
+const atmMat = new THREE.MeshBasicMaterial({
+  color: 0x3fd8d4, transparent:true, opacity:0.08, side: THREE.BackSide
+});
+scene.add(new THREE.Mesh(atmGeo, atmMat));
+const atmGeo2 = new THREE.SphereGeometry(RADIUS*1.09, 64, 64);
+const atmMat2 = new THREE.MeshBasicMaterial({
+  color: 0x2a6fbf, transparent:true, opacity:0.05, side: THREE.BackSide
+});
+scene.add(new THREE.Mesh(atmGeo2, atmMat2));
+
+/* --- marker helpers --- */
+function latLonToVector3(lat, lon, radius){
+  const phi = (90-lat) * Math.PI/180;
+  const theta = (lon+180) * Math.PI/180;
+  const x = -radius * Math.sin(phi) * Math.cos(theta);
+  const z =  radius * Math.sin(phi) * Math.sin(theta);
+  const y =  radius * Math.cos(phi);
+  return new THREE.Vector3(x,y,z);
+}
+
+const CAT_COLORS = { ancient:0xd8b262, aliens:0x3fd8d4, legendary:0xb18cf2 };
+
+function makeGlowSprite(color){
+  const size = 128;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = size;
+  const g = cv.getContext('2d');
+  const grad = g.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);
+  const hex = '#'+color.toString(16).padStart(6,'0');
+  grad.addColorStop(0, hex);
+  grad.addColorStop(0.25, hex);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad;
+  g.fillRect(0,0,size,size);
+  const tex = new THREE.CanvasTexture(cv);
+  const mat = new THREE.SpriteMaterial({map:tex, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending});
+  const spr = new THREE.Sprite(mat);
+  spr.scale.set(0.9,0.9,0.9);
+  return spr;
+}
+
+const markerObjects = [];
+SITES.forEach(site => {
+  const pos = latLonToVector3(site.lat, site.lon, RADIUS + 0.06);
+  const color = CAT_COLORS[site.cat];
+
+  const dotGeo = new THREE.SphereGeometry(0.045, 12, 12);
+  const dotMat = new THREE.MeshBasicMaterial({color});
+  const dot = new THREE.Mesh(dotGeo, dotMat);
+  dot.position.copy(pos);
+
+  const glow = makeGlowSprite(color);
+  glow.position.copy(pos);
+
+  glow.userData.site = site;
+  dot.userData.site = site;
+  glow.userData.baseScale = 0.9;
+  glow.userData.kind = 'mystery';
+  dot.userData.kind = 'mystery';
+
+  globeGroup.add(dot);
+  globeGroup.add(glow);
+  markerObjects.push(glow, dot);
+  site._sprite = glow;
+});
+
+/* Codex hub markers — larger, distinct beacons for each knowledge category */
+const codexObjects = [];
+CODEX_CATEGORIES.forEach(cat => {
+  const pos = latLonToVector3(cat.lat, cat.lon, RADIUS + 0.06);
+
+  const dotGeo = new THREE.SphereGeometry(0.07, 14, 14);
+  const dotMat = new THREE.MeshBasicMaterial({color:cat.color});
+  const dot = new THREE.Mesh(dotGeo, dotMat);
+  dot.position.copy(pos);
+
+  const glow = makeGlowSprite(cat.color);
+  glow.scale.set(1.3,1.3,1.3);
+  glow.position.copy(pos);
+
+  glow.userData.codex = cat;
+  dot.userData.codex = cat;
+  glow.userData.baseScale = 1.3;
+  glow.userData.kind = 'codex';
+  dot.userData.kind = 'codex';
+  glow.visible = false; dot.visible = false;
+
+  globeGroup.add(dot);
+  globeGroup.add(glow);
+  codexObjects.push(glow, dot);
+});
+const ALL_MARKERS = markerObjects.concat(codexObjects);
+
+/* ============ INTERACTION: drag rotate + zoom ============ */
+let dragging = false, lastX=0, lastY=0, moved=0;
+let rotX = 0.25, rotY = 0.0;
+let autoSpin = true;
+let zoom = 15;
+const zoomMin = 8, zoomMax = 26;
+
+function applyRotation(){
+  globeGroup.rotation.x = rotX;
+  globeGroup.rotation.y = rotY;
+}
+applyRotation();
+
+canvas.addEventListener('pointerdown', e => {
+  dragging = true; moved = 0;
+  lastX = e.clientX; lastY = e.clientY;
+});
+window.addEventListener('pointerup', e => {
+  if(dragging && moved < 6){ handleClick(e); }
+  dragging = false;
+});
+window.addEventListener('pointermove', e => {
+  if(!dragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  moved += Math.abs(dx)+Math.abs(dy);
+  rotY += dx * 0.005;
+  rotX += dy * 0.005;
+  rotX = Math.max(-1.2, Math.min(1.2, rotX));
+  lastX = e.clientX; lastY = e.clientY;
+  applyRotation();
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoom += e.deltaY * 0.01;
+  zoom = Math.max(zoomMin, Math.min(zoomMax, zoom));
+}, {passive:false});
+
+// touch pinch zoom
+let pinchDist = null;
+canvas.addEventListener('touchmove', e => {
+  if(e.touches.length===2){
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    if(pinchDist!=null){
+      zoom -= (dist - pinchDist) * 0.02;
+      zoom = Math.max(zoomMin, Math.min(zoomMax, zoom));
+    }
+    pinchDist = dist;
+  }
+}, {passive:true});
+canvas.addEventListener('touchend', () => pinchDist=null);
+
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
+function handleClick(e){
+  const rect = canvas.getBoundingClientRect();
+  pointerNDC.x = ((e.clientX-rect.left)/rect.width)*2-1;
+  pointerNDC.y = -((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(pointerNDC, camera);
+  const pool = currentMode==='mysteries' ? markerObjects : codexObjects;
+  const hits = raycaster.intersectObjects(pool, false);
+  if(hits.length){
+    const obj = hits[0].object;
+    if(currentMode==='mysteries'){
+      const site = obj.userData.site;
+      if(site && (activeCat==='all' || site.cat===activeCat)) openPanel(site);
+    } else {
+      openCodexPanel(obj.userData.codex);
+    }
+  }
+}
+
+/* ============ UI: filters, panel, buttons ============ */
+let activeCat = 'all';
+let currentMode = 'mysteries';
+const filtersEl = document.getElementById('filters');
+const countEl = document.getElementById('siteCount');
+const hintText = document.getElementById('hintText');
+
+function updateVisibility(){
+  let count = 0;
+  if(currentMode === 'mysteries'){
+    markerObjects.forEach(obj => {
+      const site = obj.userData.site;
+      const visible = activeCat==='all' || site.cat===activeCat;
+      obj.visible = visible;
+      if(obj.isSprite && visible) count++;
+    });
+    codexObjects.forEach(obj => obj.visible = false);
+    countEl.textContent = `${count} site${count!==1?'s':''} shown`;
+    countEl.style.display = 'block';
+    filtersEl.style.display = 'flex';
+    hintText.textContent = 'Drag to rotate · Scroll to zoom · Click a glowing marker';
+  } else {
+    codexObjects.forEach(obj => obj.visible = true);
+    markerObjects.forEach(obj => obj.visible = false);
+    countEl.style.display = 'none';
+    filtersEl.style.display = 'none';
+    hintText.textContent = 'Drag to rotate · Click a beacon to open that section of the Codex';
+  }
+}
+updateVisibility();
+
+function updateLegend(){
+  const legend = document.getElementById('legend');
+  if(currentMode==='mysteries'){
+    legend.innerHTML = `
+      <div class="legend-row"><span class="legend-dot" style="background:#d8b262;box-shadow:0 0 8px #d8b262;"></span>Ancient Sites</div>
+      <div class="legend-row"><span class="legend-dot" style="background:#3fd8d4;box-shadow:0 0 8px #3fd8d4;"></span>Aliens &amp; UAP</div>
+      <div class="legend-row"><span class="legend-dot" style="background:#b18cf2;box-shadow:0 0 8px #b18cf2;"></span>Lost &amp; Legendary</div>
+    `;
+  } else {
+    legend.innerHTML = CODEX_CATEGORIES.map(c => {
+      const hex = '#'+c.color.toString(16).padStart(6,'0');
+      return `<div class="legend-row"><span class="legend-dot" style="background:${hex};box-shadow:0 0 8px ${hex};"></span>${c.icon} ${c.label}</div>`;
+    }).join('');
+  }
+}
+updateLegend();
+
+document.querySelectorAll('.modeTab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.modeTab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    currentMode = tab.dataset.mode;
+    closePanel();
+    updateVisibility();
+    updateLegend();
+  });
+});
+
+filtersEl.querySelectorAll('.pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    filtersEl.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+    pill.classList.add('active');
+    activeCat = pill.dataset.cat;
+    updateVisibility();
+  });
+});
+
+const panel = document.getElementById('panel');
+const panelInner = document.getElementById('panelInner');
+
+const CAT_LABEL = {ancient:'Ancient Site — Still Standing', aliens:'Alien & UAP Lore', legendary:'Lost & Legendary'};
+const CAT_ICON = {ancient:'△', aliens:'✧', legendary:'☾'};
+
+function researchSectionHTML(site){
+  const crossRefBtn = `<a class="deep-search-btn" href="javascript:void(0)" onclick="switchToCodex('research')" style="margin-top:14px;">📜 Continue Research in the Codex</a>`;
+  if(site.cat !== 'aliens'){
+    return `
+      <hr class="divider">
+      <div style="text-align:left;">${crossRefBtn}</div>
+    `;
+  }
+  const links = RESEARCH_LINKS.map(l =>
+    `<a class="research-link" href="${l.url}" target="_blank" rel="noopener"><span class="arrow">↗</span> ${l.label}</a>`
+  ).join('');
+  const deepSearchBtn = DEEP_SEARCH_URL
+    ? `<a class="deep-search-btn" href="${DEEP_SEARCH_URL}?q=${encodeURIComponent(site.name)}" target="_blank" rel="noopener">🔎 Search "${site.name}" in Deep.Search</a>`
+    : '';
+  return `
+    <hr class="divider">
+    <div class="research-box">
+      <div class="section-label" style="color:#1a6e5c;"><span class="badge">🗃️</span> Primary Source Archives</div>
+      ${links}
+      ${deepSearchBtn}
+      ${crossRefBtn}
+    </div>
+  `;
+}
+
+function openPanel(site){
+  panelInner.innerHTML = `
+    <div class="panel-close" id="panelClose">✕</div>
+    <div class="panel-eyebrow">${CAT_ICON[site.cat]} ${CAT_LABEL[site.cat]}</div>
+    <div class="panel-title">${site.name}</div>
+    <div class="panel-meta">${site.place}</div>
+    <div class="theory-box">
+      <div class="section-label theory"><span class="badge">🔮</span> The Alternative Theory</div>
+      <p class="section-text">${site.theory}</p>
+    </div>
+    <hr class="divider">
+    <div class="fact-box">
+      <div class="section-label fact"><span class="badge">📜</span> What We Actually Know</div>
+      <p class="section-text">${site.facts}</p>
+    </div>
+    ${researchSectionHTML(site)}
+    <div class="coords">
+      <span>LAT ${site.lat.toFixed(2)}°</span>
+      <span>LON ${site.lon.toFixed(2)}°</span>
+    </div>
+  `;
+  panel.classList.add('open');
+  document.getElementById('panelClose').addEventListener('click', closePanel);
+  autoSpin = false;
+  spinBtn.classList.remove('active');
+}
+function closePanel(){ panel.classList.remove('open'); }
+
+function switchToCodex(catId){
+  document.querySelectorAll('.modeTab').forEach(t=>t.classList.toggle('active', t.dataset.mode==='codex'));
+  currentMode = 'codex';
+  updateVisibility();
+  updateLegend();
+  const cat = CODEX_CATEGORIES.find(c => c.id===catId);
+  if(cat) openCodexPanel(cat);
+}
+
+function switchToMysteries(catId){
+  document.querySelectorAll('.modeTab').forEach(t=>t.classList.toggle('active', t.dataset.mode==='mysteries'));
+  currentMode = 'mysteries';
+  activeCat = catId;
+  filtersEl.querySelectorAll('.pill').forEach(p => p.classList.toggle('active', p.dataset.cat===catId));
+  updateVisibility();
+  updateLegend();
+  closePanel();
+}
+
+function openCodexPanel(cat){
+  const rows = cat.links.map(l => `
+    <a class="codex-link-row" href="${l.url}" target="_blank" rel="noopener">
+      <span class="codex-link-icon">↗</span>
+      <span>
+        <div class="codex-link-title">${l.label}</div>
+        <div class="codex-link-desc">${l.desc}</div>
+      </span>
+    </a>
+  `).join('');
+
+  let relatedHTML = '';
+  if(cat.id === 'research'){
+    const mysteryCats = [
+      {id:'ancient', label:'△ Ancient Sites'},
+      {id:'aliens', label:'✧ Aliens & UAP'},
+      {id:'legendary', label:'☾ Lost & Legendary'},
+    ];
+    const btns = mysteryCats.map(m =>
+      `<a class="deep-search-btn" href="javascript:void(0)" onclick="switchToMysteries('${m.id}')" style="margin:6px 8px 0 0;">${m.label}</a>`
+    ).join('');
+    relatedHTML = `
+      <hr class="divider">
+      <div class="section-label" style="color:#6a3fb8;"><span class="badge">🌐</span> Related Mysteries</div>
+      <p class="section-text" style="margin-bottom:10px;">Jump back to the globe's mystery layer, filtered by category.</p>
+      <div>${btns}</div>
+    `;
+  }
+
+  panelInner.innerHTML = `
+    <div class="panel-close" id="panelClose">✕</div>
+    <div class="panel-eyebrow">⚜️ Castille Codex</div>
+    <div class="panel-title">${cat.icon} ${cat.label}</div>
+    <div class="panel-meta">${cat.links.length} sources in this section</div>
+    <hr class="divider">
+    <div class="fact-box" style="padding:6px 16px;">
+      ${rows}
+    </div>
+    ${relatedHTML}
+  `;
+  panel.classList.add('open');
+  document.getElementById('panelClose').addEventListener('click', closePanel);
+  autoSpin = false;
+  spinBtn.classList.remove('active');
+}
+
+/* spin + reset buttons */
+const spinBtn = document.getElementById('spinBtn');
+spinBtn.classList.add('active');
+spinBtn.addEventListener('click', () => {
+  autoSpin = !autoSpin;
+  spinBtn.classList.toggle('active', autoSpin);
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  rotX = 0.25; rotY = 0; zoom = 15; applyRotation(); closePanel();
+});
+
+/* intro */
+document.getElementById('enterBtn').addEventListener('click', () => {
+  document.getElementById('intro').classList.add('hidden');
+});
+
+/* ============ RENDER LOOP ============ */
+function onResize(){
+  W = innerWidth; H = innerHeight;
+  renderer.setSize(W,H);
+  camera.aspect = W/H;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', onResize);
+
+let t0 = performance.now();
+function animate(now){
+  const dt = Math.min((now - t0)/1000, 0.05);
+  t0 = now;
+
+  if(autoSpin && !dragging) rotY += dt * 0.06;
+  applyRotation();
+
+  camera.position.set(0,0,zoom);
+  camera.lookAt(0,0,0);
+
+  // pulse markers
+  const pulse = 1 + Math.sin(now*0.003)*0.12;
+  ALL_MARKERS.forEach(obj => {
+    if(obj.isSprite){
+      const base = obj.userData.baseScale || 0.9;
+      obj.scale.set(base*pulse, base*pulse, base*pulse);
+    }
+  });
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
