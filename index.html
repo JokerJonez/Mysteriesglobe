@@ -241,7 +241,35 @@
   .codex-link-icon{font-size:15px; color:#6a3fb8; margin-top:2px;}
   .codex-link-title{font-family:'Cinzel',serif; font-size:14px; font-weight:700; margin-bottom:2px;}
   .codex-link-desc{font-size:13px; color:#5a4c2f; line-height:1.4;}
+  .codex-search{
+    position:fixed; top:76px; left:50%; transform:translateX(-50%);
+    z-index:6; display:none; flex-direction:column; align-items:center; gap:10px;
+    pointer-events:all; width:min(520px, 92vw);
+  }
+  .codex-search.visible{display:flex;}
+  .search-row{width:100%;}
+  .search-input{
+    width:100%; padding:13px 18px; border-radius:999px;
+    background:rgba(10,13,24,0.7); border:1px solid rgba(216,178,98,0.35);
+    color:var(--cream); font-family:'Crimson Text',serif; font-size:16px;
+    backdrop-filter:blur(6px); outline:none;
+  }
+  .search-input::placeholder{color:#7c84a0;}
+  .search-input:focus{border-color:var(--gold-1); box-shadow:0 0 16px rgba(216,178,98,0.3);}
+  .engine-row{display:flex; gap:8px; flex-wrap:wrap; justify-content:center;}
+  .engine-btn{
+    font-family:'Cinzel',serif; font-size:11px; letter-spacing:0.5px;
+    padding:8px 14px; border-radius:999px; cursor:pointer;
+    background:rgba(10,13,24,0.6); border:1px solid rgba(216,178,98,0.25);
+    color:#d8d3c4; transition:all .2s ease; backdrop-filter:blur(4px);
+  }
+  .engine-btn:hover, .engine-btn:active{
+    border-color:var(--gold-1); color:var(--gold-1);
+    box-shadow:0 0 12px rgba(216,178,98,0.3);
+  }
   @media (max-width:640px){
+    .codex-search{top:70px;}
+    .engine-btn{font-size:10px; padding:7px 11px;}
     #legend{display:none;}
     .hint{bottom:130px;}
     .modeSwitch{top:auto; bottom:172px;}
@@ -279,6 +307,19 @@
 <div class="modeSwitch" id="modeSwitch">
   <div class="modeTab active" data-mode="mysteries">🗺️ Mysteries</div>
   <div class="modeTab" data-mode="codex">⚜️ Castille Codex</div>
+</div>
+
+<div id="codexSearch" class="codex-search">
+  <div class="search-row">
+    <input type="text" id="searchInput" class="search-input" placeholder="Search across your engines..." />
+  </div>
+  <div class="engine-row">
+    <div class="engine-btn" data-engine="bing">⊞ Bing</div>
+    <div class="engine-btn" data-engine="ddg">🦆 DuckDuckGo</div>
+    <div class="engine-btn" data-engine="google">G Google</div>
+    <div class="engine-btn" data-engine="archive">📜 Archive</div>
+    <div class="engine-btn" data-engine="youtube">▶ YouTube</div>
+  </div>
 </div>
 
 <div class="hint" id="hintText">Drag to rotate · Scroll to zoom · Click a glowing marker</div>
@@ -881,6 +922,30 @@ function updateLegend(){
 }
 updateLegend();
 
+/* ============ MULTI-ENGINE SEARCH ============ */
+const SEARCH_ENGINES = {
+  bing:    q => `https://www.bing.com/search?q=${encodeURIComponent(q)}`,
+  ddg:     q => `https://duckduckgo.com/?q=${encodeURIComponent(q)}`,
+  google:  q => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+  archive: q => `https://archive.org/search?query=${encodeURIComponent(q)}`,
+  youtube: q => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
+};
+const searchInput = document.getElementById('searchInput');
+document.querySelectorAll('.engine-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const q = searchInput.value.trim();
+    if(!q) { searchInput.focus(); return; }
+    const url = SEARCH_ENGINES[btn.dataset.engine](q);
+    window.open(url, '_blank', 'noopener');
+  });
+});
+searchInput.addEventListener('keydown', e => {
+  if(e.key === 'Enter'){
+    const q = searchInput.value.trim();
+    if(q) window.open(SEARCH_ENGINES.google(q), '_blank', 'noopener');
+  }
+});
+
 document.querySelectorAll('.modeTab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.modeTab').forEach(t=>t.classList.remove('active'));
@@ -889,6 +954,7 @@ document.querySelectorAll('.modeTab').forEach(tab => {
     closePanel();
     updateVisibility();
     updateLegend();
+    document.getElementById('codexSearch').classList.toggle('visible', currentMode==='codex');
   });
 });
 
@@ -965,6 +1031,7 @@ function switchToCodex(catId){
   currentMode = 'codex';
   updateVisibility();
   updateLegend();
+  document.getElementById('codexSearch').classList.add('visible');
   const cat = CODEX_CATEGORIES.find(c => c.id===catId);
   if(cat) openCodexPanel(cat);
 }
@@ -976,6 +1043,7 @@ function switchToMysteries(catId){
   filtersEl.querySelectorAll('.pill').forEach(p => p.classList.toggle('active', p.dataset.cat===catId));
   updateVisibility();
   updateLegend();
+  document.getElementById('codexSearch').classList.remove('visible');
   closePanel();
 }
 
